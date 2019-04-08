@@ -14,6 +14,58 @@
 
 struct ili9488_opt_t g_ili9488_display_opt;
 
+/************************************************************************/
+/* defines                                                              */
+/************************************************************************/
+
+#define LED_PIO       PIOC
+#define LED_PIO_ID    ID_PIOC
+#define LED_IDX       8u
+#define LED_IDX_MASK  (1u << LED_IDX)
+
+
+
+/************************************************************************/
+/* constants                                                            */
+/************************************************************************/
+
+
+/************************************************************************/
+/* variaveis globais                                                    */
+/************************************************************************/
+volatile Bool f_rtt_alarme = false;
+
+
+
+/************************************************************************/
+/* interrupcoes                                                         */
+/************************************************************************/
+
+void RTT_Handler(void)
+{
+	uint32_t ul_status;
+
+	/* Get RTT status */
+	ul_status = rtt_get_status(RTT);
+
+	/* IRQ due to Time has changed */
+	if ((ul_status & RTT_SR_RTTINC) == RTT_SR_RTTINC) {
+		
+	}
+
+	/* IRQ due to Alarm */
+	if ((ul_status & RTT_SR_ALMS) == RTT_SR_ALMS) {
+		
+		pin_toggle(LED_PIO, LED_IDX_MASK);    // BLINK Led
+		f_rtt_alarme = true;                  // flag RTT alarme
+	}
+}
+
+
+/************************************************************************/
+/* funcoes                                                              */
+/************************************************************************/
+
 void configure_lcd(void){
 	/* Initialize display parameter */
 	g_ili9488_display_opt.ul_width = ILI9488_LCD_WIDTH;
