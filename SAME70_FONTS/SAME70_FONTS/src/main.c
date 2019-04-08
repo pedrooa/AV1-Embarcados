@@ -58,6 +58,7 @@ volatile Bool f_rtt_alarme = false;
 volatile Bool but3_flag = false;
 volatile Bool but2_flag = false;
 volatile Bool flag_rtc_alarme = true;
+volatile Bool flag_stop = false;
 
 
 /************************************************************************/
@@ -292,8 +293,19 @@ int main(void) {
 	//font_draw_text(&sourcecodepro_28, "OIMUNDO", 50, 50, 1);
 	//font_draw_text(&calibri_36, "Oi Mundo! #$!@", 50, 100, 1);
 	//font_draw_text(&arial_72, "102456", 50, 200, 2);
-	ciclos = 0;
 	while(1) {
+		
+		if(but2_flag && flag_stop){
+			flag_stop = false;
+			d = 0;
+			rtc_set_time(RTC, HOUR, MINUTE, SECOND);
+			rtc_set_time_alarm(RTC, 1, HOUR, 1, MINUTE,1, SECOND+1);
+			
+			but2_flag = false;
+			
+		}
+		
+	if(!flag_stop){
 	/* Entrar em modo sleep */
 	pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
 	
@@ -314,15 +326,9 @@ int main(void) {
 		but3_flag = false;
 	}
 	if (but2_flag){
-		if(count_button2 == 0){
-			
-			
-			count_button2 +=1;
-			
-		}
-		d = 0;
-		rtc_set_time(RTC, HOUR, MINUTE, SECOND);
-		rtc_set_time_alarm(RTC, 1, HOUR, 1, MINUTE,1, SECOND+1);
+		flag_stop = true;
+
+
 
 		but2_flag = false;
 	}
@@ -383,6 +389,7 @@ int main(void) {
        */
       f_rtt_alarme = false;
     }
+  }
   }
 		
 	
