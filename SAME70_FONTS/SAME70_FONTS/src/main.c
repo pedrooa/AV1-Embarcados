@@ -110,16 +110,13 @@ void RTC_Handler(void)
 	*/
 	if ((ul_status & RTC_SR_SEC) == RTC_SR_SEC) {
 		rtc_clear_status(RTC, RTC_SCCR_SECCLR);
+					flag_rtc_alarme = true;
+
 	}
 	
 	/* Time or date alarm */
 	if ((ul_status & RTC_SR_ALARM) == RTC_SR_ALARM) {
 			rtc_clear_status(RTC, RTC_SCCR_ALRCLR);
-			rtc_set_date_alarm(RTC, 1 , MOUNTH, 1, DAY);
-			int hora, min, sec;
-			rtc_get_time(RTC, &hora, &min, &sec);
-			rtc_set_time_alarm(RTC, 1, hora, 1, min,1, sec+1);
-			flag_rtc_alarme = true;
 
 	}
 	
@@ -234,7 +231,7 @@ void RTC_init(){
 	NVIC_EnableIRQ(RTC_IRQn);
 
 	/* Ativa interrupcao via alarme */
-	rtc_enable_interrupt(RTC,  RTC_IER_ALREN);
+	rtc_enable_interrupt(RTC,  RTC_IER_SECEN);
 	
 
 
@@ -279,6 +276,7 @@ int main(void) {
 	char b[512];
 	int ciclos = 0;
 	float d = 0;
+	int count_button2 = 0;
 	
 	BUT3_init();
 	BUT2_init();
@@ -294,15 +292,18 @@ int main(void) {
 	//font_draw_text(&sourcecodepro_28, "OIMUNDO", 50, 50, 1);
 	//font_draw_text(&calibri_36, "Oi Mundo! #$!@", 50, 100, 1);
 	//font_draw_text(&arial_72, "102456", 50, 200, 2);
+	ciclos = 0;
 	while(1) {
 	/* Entrar em modo sleep */
-	//pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
+	pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
 	
 	if (flag_rtc_alarme){
-			font_draw_text(&calibri_36, "tempo(hh/mm/ss):", 50, 200, 2);
+			rtc_set_date_alarm(RTC, 1 , MOUNTH, 1, DAY);
 			int hora, min, sec;
 			rtc_get_time(RTC, &hora, &min, &sec);
-			sprintf(b,"%d, %d, %d", hora,min,sec);
+			rtc_set_time_alarm(RTC, 1, hora, 1, min,1, sec+1);
+			font_draw_text(&calibri_36, "tempo:", 50, 200, 2);
+			sprintf(b,"%02d : %02d : %02d", hora,min,sec);
 			font_draw_text(&calibri_36, b, 50, 250, 2);
 
 			flag_rtc_alarme = false;
@@ -313,13 +314,16 @@ int main(void) {
 		but3_flag = false;
 	}
 	if (but2_flag){
+		if(count_button2 == 0){
+			
+			
+			count_button2 +=1;
+			
+		}
 		d = 0;
 		rtc_set_time(RTC, HOUR, MINUTE, SECOND);
 		rtc_set_time_alarm(RTC, 1, HOUR, 1, MINUTE,1, SECOND+1);
 
-		
-		
-		//tempototal = 0;
 		but2_flag = false;
 	}
 		
