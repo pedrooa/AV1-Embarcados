@@ -12,16 +12,33 @@
 #include "arial_72.h"
 #include "math.h"
 
+
 struct ili9488_opt_t g_ili9488_display_opt;
 
 /************************************************************************/
 /* defines                                                              */
 /************************************************************************/
 
+#define YEAR        2019
+#define MOUNTH      1
+#define DAY         1
+#define WEEK        1
+#define HOUR        0
+#define MINUTE      0
+#define SECOND      0
+
+
+
 #define LED_PIO       PIOC
 #define LED_PIO_ID    ID_PIOC
 #define LED_IDX       8u
 #define LED_IDX_MASK  (1u << LED_IDX)
+
+
+#define BUT2_PIO           PIOC                 // periferico que controla o LED
+#define BUT2_PIO_ID        ID_PIOC                    // ID do periférico PIOC (controla LED)
+#define BUT2_PIO_IDX       31u                    // ID do LED no PIO
+#define BUT2_PIO_IDX_MASK  (1u << BUT2_PIO_IDX)   // Mascara para CONTROLARMOS o LED
 
 
 #define BUT3_PIO           PIOA                  // periferico que controla o LED
@@ -38,7 +55,9 @@ float raio = 0.650/2;
 /* variaveis globais                                                    */
 /************************************************************************/
 volatile Bool f_rtt_alarme = false;
-volatile Bool but3_flag;
+volatile Bool but3_flag = false;
+volatile Bool but2_flag = false;
+volatile Bool flag_rtc_alarme = true;
 
 
 /************************************************************************/
@@ -60,7 +79,7 @@ void RTT_Handler(void)
 	/* IRQ due to Alarm */
 	if ((ul_status & RTT_SR_ALMS) == RTT_SR_ALMS) {
 		
-		pin_toggle(LED_PIO, LED_IDX_MASK);    // BLINK Led
+		//pin_toggle(LED_PIO, LED_IDX_MASK);    // BLINK Led
 		f_rtt_alarme = true;                  // flag RTT alarme
 	}
 }
@@ -72,6 +91,44 @@ static void Button3_Handler(uint32_t id, uint32_t mask)
 {
 	but3_flag = true;
 }
+/**
+*  Handle Interrupcao botao 2
+*/
+static void Button2_Handler(uint32_t id, uint32_t mask)
+{
+	but2_flag = true;
+}
+
+void RTC_Handler(void)
+{
+	uint32_t ul_status = rtc_get_status(RTC);
+
+	/*
+	*  Verifica por qual motivo entrou
+	*  na interrupcao, se foi por segundo
+	*  ou Alarm
+	*/
+	if ((ul_status & RTC_SR_SEC) == RTC_SR_SEC) {
+		rtc_clear_status(RTC, RTC_SCCR_SECCLR);
+	}
+	
+	/* Time or date alarm */
+	if ((ul_status & RTC_SR_ALARM) == RTC_SR_ALARM) {
+			rtc_clear_status(RTC, RTC_SCCR_ALRCLR);
+			rtc_set_date_alarm(RTC, 1 , MOUNTH, 1, DAY);
+			int hora, min, sec;
+			rtc_get_time(RTC, &hora, &min, &sec);
+			rtc_set_time_alarm(RTC, 1, hora, 1, min,1, sec+1);
+			flag_rtc_alarme = true;
+
+	}
+	
+	rtc_clear_status(RTC, RTC_SCCR_ACKCLR);
+	rtc_clear_status(RTC, RTC_SCCR_TIMCLR);
+	rtc_clear_status(RTC, RTC_SCCR_CALCLR);
+	rtc_clear_status(RTC, RTC_SCCR_TDERRCLR);
+	
+}
 
 
 /************************************************************************/
@@ -82,7 +139,7 @@ static void Button3_Handler(uint32_t id, uint32_t mask)
 /**
 * @Brief Inicializa o pino do BUT
 */
-void BUT_init(void){
+void BUT3_init(void){
 	/* config. pino botao em modo de entrada */
 	pmc_enable_periph_clk(BUT3_PIO_ID);
 	pio_set_input(BUT3_PIO, BUT3_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
@@ -96,6 +153,25 @@ void BUT_init(void){
 	/* e configura sua prioridade                        */
 	NVIC_EnableIRQ(BUT3_PIO_ID);
 	NVIC_SetPriority(BUT3_PIO_ID, 1);
+};
+
+/**
+* @Brief Inicializa o pino do BUT
+*/
+void BUT2_init(void){
+	/* config. pino botao em modo de entrada */
+	pmc_enable_periph_clk(BUT3_PIO_ID);
+	pio_set_input(BUT2_PIO, BUT2_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+
+	/* config. interrupcao em borda de descida no botao do kit */
+	/* indica funcao (but_Handler) a ser chamada quando houver uma interrupção */
+	pio_enable_interrupt(BUT2_PIO, BUT2_PIO_IDX_MASK);
+	pio_handler_set(BUT2_PIO, BUT2_PIO_ID, BUT2_PIO_IDX_MASK, PIO_IT_FALL_EDGE, Button2_Handler);
+
+	/* habilita interrupçcão do PIO que controla o botao */
+	/* e configura sua prioridade                        */
+	NVIC_EnableIRQ(BUT2_PIO_ID);
+	NVIC_SetPriority(BUT2_PIO_ID, 1);
 };
 
 void pin_toggle(Pio *pio, uint32_t mask){
@@ -119,7 +195,7 @@ static void RTT_init(uint16_t pllPreScale, uint32_t IrqNPulses)
 {
 	uint32_t ul_previous_time;
 
-	/* Configure RTT for a 1 second tick interrupt */
+	/* Configure RTT for a 4 second tick interrupt */
 	rtt_sel_source(RTT, false);
 	rtt_init(RTT, pllPreScale);
 	
@@ -136,6 +212,33 @@ static void RTT_init(uint16_t pllPreScale, uint32_t IrqNPulses)
 	rtt_enable_interrupt(RTT, RTT_MR_ALMIEN);
 }
 
+
+/**
+* Configura o RTC para funcionar com interrupcao de alarme
+*/
+void RTC_init(){
+	/* Configura o PMC */
+	pmc_enable_periph_clk(ID_RTC);
+
+	/* Default RTC configuration, 24-hour mode */
+	rtc_set_hour_mode(RTC, 0);
+
+	/* Configura data e hora manualmente */
+	rtc_set_date(RTC, YEAR, MOUNTH, DAY, WEEK);
+	rtc_set_time(RTC, HOUR, MINUTE, SECOND);
+
+	/* Configure RTC interrupts */
+	NVIC_DisableIRQ(RTC_IRQn);
+	NVIC_ClearPendingIRQ(RTC_IRQn);
+	NVIC_SetPriority(RTC_IRQn, 0);
+	NVIC_EnableIRQ(RTC_IRQn);
+
+	/* Ativa interrupcao via alarme */
+	rtc_enable_interrupt(RTC,  RTC_IER_ALREN);
+	
+
+
+}
 
 
 void configure_lcd(void){
@@ -167,7 +270,7 @@ void font_draw_text(tFont *font, const char *text, int x, int y, int spacing) {
 }
 
 float calcula_velocidade_angular(int ciclos, int tempo){
-	return (float) 2*PI*ciclos/tempo;
+	return (float) 2*M_PI*ciclos/tempo;
 	
 }
 
@@ -175,17 +278,42 @@ float calcula_velocidade_angular(int ciclos, int tempo){
 int main(void) {
 	char b[512];
 	int ciclos = 0;
+	float d = 0;
+	
+	BUT3_init();
+	BUT2_init();
+	//RTT_init();
 	board_init();
 	sysclk_init();	
 	configure_lcd();
+	RTC_init();
+	f_rtt_alarme = true;
 	
-	font_draw_text(&sourcecodepro_28, "OIMUNDO", 50, 50, 1);
-	font_draw_text(&calibri_36, "Oi Mundo! #$!@", 50, 100, 1);
-	font_draw_text(&arial_72, "102456", 50, 200, 2);
+	//font_draw_text(&sourcecodepro_28, "OIMUNDO", 50, 50, 1);
+	//font_draw_text(&calibri_36, "Oi Mundo! #$!@", 50, 100, 1);
+	//font_draw_text(&arial_72, "102456", 50, 200, 2);
 	while(1) {
+	/* Entrar em modo sleep */
+	//pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
+	
+	if (flag_rtc_alarme){
+			font_draw_text(&calibri_36, "tempo(hh/mm/ss):", 50, 200, 2);
+			int hora, min, sec;
+			rtc_get_time(RTC, &hora, &min, &sec);
+			sprintf(b,"%d, %d, %d", hora,min,sec);
+			font_draw_text(&calibri_36, b, 50, 250, 2);
+
+			flag_rtc_alarme = false;
+		}
 		
 	if (but3_flag){
 		ciclos += 1;
+		but3_flag = false;
+	}
+	if (but2_flag){
+		d = 0;
+		//tempototal = 0;
+		but2_flag = false;
 	}
 		
 	if (f_rtt_alarme){
@@ -226,10 +354,12 @@ int main(void) {
        */
 	  float w = calcula_velocidade_angular(ciclos, 4);
 	  float v = w*raio;
+	  d += 2*M_PI*raio*ciclos;
 	  
-	  sprintf(b,"Velocidade Angular: %d",w);
-	  
-	  font_draw_text(&arial_72, b, 50, 200, 2);
+	  sprintf(b,"v: %.2f km/h",v*3.6);
+	  font_draw_text(&calibri_36, b, 50, 50, 1);
+	  sprintf(b,"d: %.2f m",d);
+	  font_draw_text(&calibri_36, b, 50, 100, 1);
       
 	  /*
        * Reseta ciclos
@@ -244,5 +374,5 @@ int main(void) {
     }
   }
 		
-	}
+	
 }
