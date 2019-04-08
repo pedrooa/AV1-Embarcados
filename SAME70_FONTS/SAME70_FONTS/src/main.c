@@ -287,6 +287,8 @@ int main(void) {
 	sysclk_init();	
 	configure_lcd();
 	RTC_init();
+	rtc_set_time_alarm(RTC, 1, HOUR, 1, MINUTE,1, SECOND+1);
+
 	f_rtt_alarme = true;
 	
 	//font_draw_text(&sourcecodepro_28, "OIMUNDO", 50, 50, 1);
@@ -312,6 +314,11 @@ int main(void) {
 	}
 	if (but2_flag){
 		d = 0;
+		rtc_set_time(RTC, HOUR, MINUTE, SECOND);
+		rtc_set_time_alarm(RTC, 1, HOUR, 1, MINUTE,1, SECOND+1);
+
+		
+		
 		//tempototal = 0;
 		but2_flag = false;
 	}
