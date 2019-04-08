@@ -140,7 +140,10 @@ void RTC_Handler(void)
 void BUT3_init(void){
 	/* config. pino botao em modo de entrada */
 	pmc_enable_periph_clk(BUT3_PIO_ID);
-	pio_set_input(BUT3_PIO, BUT3_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+
+	pio_set_input(BUT3_PIO, BUT3_PIO_IDX_MASK, PIO_PULLUP);
+	pio_set_debounce_filter(BUT3_PIO,BUT3_PIO_IDX_MASK,50);
+	
 
 	/* config. interrupcao em borda de descida no botao do kit */
 	/* indica funcao (but_Handler) a ser chamada quando houver uma interrupção */
@@ -277,7 +280,7 @@ int main(void) {
 	char b[512];
 	int ciclos = 0;
 	float d = 0;
-	int count_button2 = 0;
+	int count_button3 = 0;
 	
 	BUT3_init();
 	BUT2_init();
@@ -293,6 +296,8 @@ int main(void) {
 	//font_draw_text(&sourcecodepro_28, "OIMUNDO", 50, 50, 1);
 	//font_draw_text(&calibri_36, "Oi Mundo! #$!@", 50, 100, 1);
 	//font_draw_text(&arial_72, "102456", 50, 200, 2);
+	ciclos = 0;
+
 	while(1) {
 		
 		if(but2_flag && flag_stop){
