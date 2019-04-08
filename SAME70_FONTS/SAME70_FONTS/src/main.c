@@ -10,7 +10,7 @@
 #include "sourcecodepro_28.h"
 #include "calibri_36.h"
 #include "arial_72.h"
-
+#include "math.h"
 
 struct ili9488_opt_t g_ili9488_display_opt;
 
@@ -33,8 +33,7 @@ struct ili9488_opt_t g_ili9488_display_opt;
 /************************************************************************/
 /* constants                                                            */
 /************************************************************************/
-
-
+float raio = 0.650/2;
 /************************************************************************/
 /* variaveis globais                                                    */
 /************************************************************************/
@@ -167,8 +166,14 @@ void font_draw_text(tFont *font, const char *text, int x, int y, int spacing) {
 	}	
 }
 
+float calcula_velocidade_angular(int ciclos, int tempo){
+	return (float) 2*PI*ciclos/tempo;
+	
+}
+
 
 int main(void) {
+	char b[512];
 	int ciclos = 0;
 	board_init();
 	sysclk_init();	
@@ -214,11 +219,27 @@ int main(void) {
       * caso queira ler o valor atual do RTT, basta usar a funcao
       *   rtt_read_timer_value()
       */
+	 
+	 
+	  /*
+       * Chama funcao que calcula velocidade angular
+       */
+	  float w = calcula_velocidade_angular(ciclos, 4);
+	  float v = w*raio;
+	  
+	  sprintf(b,"Velocidade Angular: %d",w);
+	  
+	  font_draw_text(&arial_72, b, 50, 200, 2);
       
+	  /*
+       * Reseta ciclos
+       */
+	  ciclos = 0;
+
+	  
       /*
        * CLEAR FLAG
        */
-	  ciclos = 0;
       f_rtt_alarme = false;
     }
   }
